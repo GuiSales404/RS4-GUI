@@ -8,6 +8,7 @@ from PIL import Image
 import zipfile
 import tempfile
 import plotly.graph_objects as go
+import pandas as pd
 
 
 st.title("Visualizador de Resultados de Clusterização via ZIP")
@@ -35,11 +36,6 @@ if uploaded_file:
 
             methods_path = os.path.join(base_dir, selected_series)
             methods = sorted(os.listdir(methods_path))
-            selected_method = st.selectbox("Selecione o Método:", methods)
-
-            output_dir = os.path.join(methods_path, selected_method)
-
-            st.subheader(f"Série: {selected_series} | Método: {selected_method}")
 
             # Caminho do .txt da série original
             serie_txt_path = os.path.join(base_dir, 'MixedBag', f'{selected_series}.txt')
@@ -53,65 +49,22 @@ if uploaded_file:
                 st.warning("Série original não encontrada no formato esperado (.txt em MixedBag).")
                 serie = None
 
-            # Mostrar imagens
-            for img_name in ['regime_bar.png', 'dendrograma.png', 'silhouette.png']:
-                img_path = os.path.join(output_dir, img_name)
-                if os.path.exists(img_path):
-                    st.image(Image.open(img_path), caption=img_name, use_container_width=True)
+            selected_methods = st.multiselect("Selecione os Métodos a Comparar:", methods)
 
-            # Mostrar métricas
-            metrics_path = os.path.join(output_dir, 'metrics.json')
-            if os.path.exists(metrics_path):
-                st.subheader("Métricas")
-                with open(metrics_path) as f:
-                    metrics = json.load(f)
-                st.json(metrics)
+            # Exibe subheader com a série escolhida
+            st.subheader(f"Série: {selected_series}")
+            start_app = st.button("Iniciar")
+            # Se pelo menos um método for selecionado
+            if selected_methods and start_app:
 
-            # Carregar snippets
-            snippets = None
-            snippets_json = os.path.join(output_dir, 'snippets.json')
-            if os.path.exists(snippets_json):
-                with open(snippets_json) as f:
-                    snippets = json.load(f)
-            elif os.path.exists(os.path.join(output_dir, 'snippets.npy')):
-                snippets = np.load(os.path.join(output_dir, 'snippets.npy'), allow_pickle=True)
-                snippets = [{'index': int(s[0]), 'subsequence': s[1].tolist()} for s in snippets]
-
-
-            if snippets:
-                st.subheader("Visualização dos Snippets (Plotly)")
-
-                max_snippets = len(snippets)
-                num_snippets = st.slider(
-                    "Número de snippets a visualizar:",
-                    min_value=1,    
-                    max_value=max_snippets,
-                    value=min(5, max_snippets)
-                )
-
-                selected_snippets = snippets[:num_snippets]
-
-                # === Gráfico 1: Shapes dos snippets ===
+                # PREPARA GRÁFICO SHAPES DOS SNIPPETS
                 fig_shapes = go.Figure()
-                for i, snip in enumerate(selected_snippets):
-                    fig_shapes.add_trace(go.Scatter(
-                        y=snip['subsequence'],
-                        mode='lines',
-                        name=f'Snippet {i+1}'
-                    ))
-                fig_shapes.update_layout(
-                    title="Shapes dos Snippets",
-                    xaxis_title="Índice",
-                    yaxis_title="Valor",
-                    height=400
-                )
-                st.plotly_chart(fig_shapes, use_container_width=True)
 
-                # === Gráfico 2: Snippets sobre a série original ===
+                # PREPARA GRÁFICO SNIPPETS NA SÉRIE
+                fig_series = go.Figure()
+
+                # Adiciona a série completa em cinza (se disponível)
                 if serie is not None:
-                    fig_series = go.Figure()
-
-                    # Série completa em cinza
                     fig_series.add_trace(go.Scatter(
                         y=serie,
                         mode='lines',
@@ -120,28 +73,88 @@ if uploaded_file:
                         opacity=0.7
                     ))
 
-                    subseq_size = len(snippets[0]['subsequence'])
+                # PREPARA MÉTRICAS COMPARATIVAS
+                metrics_list = []
 
-                    # Snippets sobrepostos
-                    for i, snip in enumerate(selected_snippets):
-                        idx = snip['index']
-                        x_vals = list(range(idx, idx + subseq_size))
-                        y_vals = serie[idx:idx + subseq_size]
+                # LOOP NOS MÉTODOS SELECIONADOS
+                for method in selected_methods:
+                    output_dir = os.path.join(methods_path, method)
+                    
+                    st.markdown(f"### Método: {method}")
 
-                        fig_series.add_trace(go.Scatter(
-                            x=x_vals,
-                            y=y_vals,
-                            mode='lines',
-                            name=f'Snippet {i+1}',
-                            line=dict(width=3)
-                        ))
+                    # --- MOSTRAR IMAGENS ---
+                    for img_name in ['regime_bar.png', 'dendrograma.png', 'silhouette.png']:
+                        img_path = os.path.join(output_dir, img_name)
+                        if os.path.exists(img_path):
+                            st.image(Image.open(img_path), caption=f"{method} - {img_name}", use_container_width=True)
 
-                    fig_series.update_layout(
-                        title="Snippets na Série Temporal",
-                        xaxis_title="Índice",
-                        yaxis_title="Valor",
-                        height=450
-                    )
-                    st.plotly_chart(fig_series, use_container_width=True)
-                else:
-                    st.warning("Série original não disponível para sobrepor os snippets.")
+                    # --- CARREGA SNIPPETS ---
+                    snippets = None
+                    snippets_json = os.path.join(output_dir, 'snippets.json')
+                    if os.path.exists(snippets_json):
+                        with open(snippets_json) as f:
+                            snippets = json.load(f)
+                    elif os.path.exists(os.path.join(output_dir, 'snippets.npy')):
+                        snippets = np.load(os.path.join(output_dir, 'snippets.npy'), allow_pickle=True)
+                        snippets = [{'index': int(s[0]), 'subsequence': s[1].tolist()} for s in snippets]
+
+                    # --- PLOTA SNIPPETS SHAPES ---
+                    if snippets:
+                        for i, snip in enumerate(snippets[:3]):  # Mostra até 3 por método (ou ajuste como quiser)
+                            fig_shapes.add_trace(go.Scatter(
+                                y=snip['subsequence'],
+                                mode='lines',
+                                name=f'{method} - Snippet {i+1}'
+                            ))
+
+                        # --- PLOTA SNIPPETS NA SÉRIE ---
+                        if serie is not None:
+                            subseq_size = len(snippets[0]['subsequence'])
+                            for i, snip in enumerate(snippets[:3]):
+                                idx = snip['index']
+                                x_vals = list(range(idx, idx + subseq_size))
+                                y_vals = serie[idx:idx + subseq_size]
+
+                                fig_series.add_trace(go.Scatter(
+                                    x=x_vals,
+                                    y=y_vals,
+                                    mode='lines',
+                                    name=f'{method} - Snippet {i+1}',
+                                    line=dict(width=3)
+                                ))
+
+                    # --- CARREGA E ARMAZENA MÉTRICAS ---
+                    metrics_path = os.path.join(output_dir, 'metrics.json')
+                    if os.path.exists(metrics_path):
+                        with open(metrics_path) as f:
+                            metrics = json.load(f)
+
+                        # Flatten se necessário
+                        flat_metrics = {}
+                        for k, v in metrics.items():
+                            if isinstance(v, dict):
+                                for sub_k, sub_v in v.items():
+                                    flat_metrics[f"{k}.{sub_k}"] = sub_v
+                            else:
+                                flat_metrics[k] = v
+
+                        # Adiciona coluna "Método"
+                        for metric_name, metric_value in flat_metrics.items():
+                            metrics_list.append({
+                                "Método": method,
+                                "Métrica": metric_name,
+                                "Valor": metric_value
+                            })
+
+                # --- EXIBE OS GRÁFICOS ---
+                st.subheader("Shapes dos Snippets Comparados")
+                st.plotly_chart(fig_shapes, use_container_width=True)
+
+                st.subheader("Snippets sobrepostos na Série Temporal")
+                st.plotly_chart(fig_series, use_container_width=True)
+
+                # --- EXIBE TABELA DE MÉTRICAS COMPARATIVAS ---
+                if metrics_list:
+                    st.subheader("Métricas Comparativas")
+                    metrics_df = pd.DataFrame(metrics_list)
+                    st.dataframe(metrics_df)
