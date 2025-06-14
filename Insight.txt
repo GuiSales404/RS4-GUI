@@ -1,7 +1,5 @@
 - Adicionar logo Projeto
-- Label do zip disponível para download
 - Separar métricas e snippets
 - Adicionar limite de aceitação
-- Adicionar SnippetFinder 
 - Fazer o deploy da aplicação para teste
 
