@@ -17,8 +17,8 @@ k_min = st.number_input("Valor mínimo de k:", min_value=2, max_value=100, value
 k_max = st.number_input("Valor máximo de k:", min_value=2, max_value=100, value=25)
 k_range = (k_min, k_max)
 
-# Métodos disponíveis
-available_methods = ['agglomerative', 'hierarchical', 'hdbscan', 'minibatchkmeans', 'kshape']
+# Métodos disponíveis (agora inclui snippet_finder)
+available_methods = ['agglomerative', 'hierarchical', 'hdbscan', 'minibatchkmeans', 'kshape', 'snippet_finder']
 selected_methods = st.multiselect("Selecione os métodos de clustering:", available_methods)
 
 # Parâmetros adicionais (aparecem dinamicamente!)
@@ -43,7 +43,12 @@ if 'minibatchkmeans' in selected_methods:
 if 'kshape' in selected_methods:
     st.info("KShape não possui parâmetros adicionais.")
 
-# Simulação de MixedBag
+# --- NOVO: Snippet Finder (STUMPY) ---
+if 'snippet_finder' in selected_methods:
+    num_snippets_snippet_finder = st.number_input("Snippet Finder - número de snippets:", min_value=1, max_value=20, value=7)
+    method_params['snippet_finder'] = {'num_snippets': num_snippets_snippet_finder}
+
+# --- Simulação de time_series ---
 base_path = 'time_series'
 dataset = {}
 
@@ -58,7 +63,7 @@ for file in os.listdir(base_path):
 series_available = list(dataset.keys())
 selected_series = st.multiselect("Selecione as séries temporais a processar:", series_available)
 
-# Rodar
+# --- Rodar ---
 if st.button("Rodar Clusterização"):
     st.write("Rodando com os seguintes parâmetros:")
     st.json({
@@ -73,3 +78,4 @@ if st.button("Rodar Clusterização"):
     # run_selected_clusterings(selected_series, dataset, subseq_size, k_range, selected_methods, method_params)
 
     st.success("Execução finalizada! Resultados salvos na pasta ./resultados")
+

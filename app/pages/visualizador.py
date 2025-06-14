@@ -39,7 +39,7 @@ if uploaded_file:
             selected_series = st.selectbox("Selecione a Série:", series)
             methods_path = os.path.join(base_dir, selected_series)
             methods = sorted(os.listdir(methods_path))
-            methods.remove("scores.csv")
+            # methods.remove("scores.csv")
 
             time_series_dir = os.path.join("time_series")
             serie_txt_path = os.path.join(time_series_dir, f"{selected_series}.txt")
