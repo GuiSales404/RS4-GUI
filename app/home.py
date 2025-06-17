@@ -5,5 +5,7 @@ st.markdown("<h1 style='text-align: center; color: white;'>RS4 - Ferramentas de 
 
 st.write("Bem-vindo! Selecione abaixo o serviço que deseja utilizar:")
 
-st.page_link("pages/visualizador.py", label="Visualizador de Resultados", icon="📊")
-st.page_link("pages/rs4-parametrizado.py", label="Executar RS4 Parametrizado", icon="⚙️")
+st.page_link("pages/visualizador.py", label="Visualizador de Resultados", icon="📈")
+st.page_link("pages/rs4-parametrizado.py", label="Executar Algoritmos Parametrizados", icon="⚙️")
+st.page_link("pages/metricas.py", label="Comparador de Métricas", icon="📊")
+

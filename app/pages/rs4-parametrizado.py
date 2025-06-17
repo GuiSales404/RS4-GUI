@@ -32,19 +32,19 @@ def parse_number_list(s: str):
 
 def save_results(output_dir, snippets, metrics, ts, series_name):
     os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'resultados'), exist_ok=True)
+    os.makedirs(os.path.join(output_dir), exist_ok=True)
 
     snippets_json = [
         {"index": int(idx), "subsequence": subseq.tolist()} for idx, subseq in snippets
     ]
-    with open(os.path.join(output_dir, 'resultados', 'snippets.json'), 'w') as f:
+    with open(os.path.join(output_dir, 'snippets.json'), 'w') as f:
         json.dump(snippets_json, f, indent=4)
 
     metrics_serializable = {k: (v.tolist() if isinstance(v, np.ndarray) else v) for k, v in metrics.items()}
-    with open(os.path.join(output_dir, 'resultados', 'metrics.json'), 'w') as f:
+    with open(os.path.join(output_dir, 'metrics.json'), 'w') as f:
         json.dump(metrics_serializable, f, indent=4)
 
-    ts_dir = os.path.join("resultados", "time_series")
+    ts_dir = os.path.join("time_series")
     os.makedirs(ts_dir, exist_ok=True)
     ts_path = os.path.join(ts_dir, series_name)
     with open(ts_path, 'w') as f:
@@ -157,6 +157,7 @@ def find_snippets_stumpy(ts, subseq_size, num_snippets):
 subseq_size = st.number_input("Tamanho da subsequência:", min_value=10, max_value=1000, value=150)
 k_min = st.number_input("k mínimo:", 2, 100, 2)
 k_max = st.number_input("k máximo:", 2, 100, 5)
+num_snippets = st.number_input("Quantidade de Snippets:", 1, 100, 1)
 k_range = (k_min, k_max)
 methods = ['agglomerative', 'hierarchical', 'hdbscan', 'minibatchkmeans', 'kshape', 'snippet_finder']
 selected_methods = st.multiselect("Selecione métodos:", methods)
@@ -192,7 +193,7 @@ if st.button("Executar Clusterizações"):
             kwargs = {
                 'ts': ts,
                 'subseq_size': subseq_size,
-                'num_snippets': 5,
+                'num_snippets': num_snippets,
                 'num_clusters': k_max if method != 'hdbscan' else None,
                 'clustering_method': method,
             }
@@ -205,11 +206,39 @@ if st.button("Executar Clusterizações"):
 
             save_results(method_output, snippets, metrics, ts, series_name)
 
-    zip_path = "resultados_zip"
+    zip_path = "resultados"
     zip_folder(output_folder, zip_path)
     with open(f"{zip_path}.zip", "rb") as f:
         st.download_button("Baixar Resultados (.zip)", f, file_name=f"{'_'.join(selected_methods)}-{'_'.join(selected_series)}.zip")
-
+        
     st.success("Processamento finalizado!")
-    st.write("Prévia de métricas da última série:")
-    st.json(metrics)
+    st.markdown("### 📊 Prévia de Métricas da Última Série Processada")
+
+    # Tabela principal
+    flat_metrics = {
+        "Tempo de Execução (s)": metrics["execution_time_sec"],
+        "Uso de Memória Atual (MB)": metrics["memory_usage_mb"],
+        "Pico de Memória (MB)": metrics["peak_memory_mb"],
+        "Área de Cobertura (Cover Area)": metrics["cover_area"]
+    }
+
+    # Exibição com st.metric
+    cols = st.columns(len(flat_metrics))
+    for i, (label, value) in enumerate(flat_metrics.items()):
+        cols[i].metric(label, round(value, 3) if isinstance(value, float) else value)
+
+    # Área de perfil
+    st.markdown("#### 📌 Área de Perfil por Snippet")
+    profile_df = pd.DataFrame({
+        "Snippet": list(range(1, len(metrics["profile_area"]) + 1)),
+        "Área de Perfil": metrics["profile_area"]
+    })
+    st.dataframe(profile_df, use_container_width=True)
+
+    # Série do perfil mínimo (opcional: para debug ou análise visual)
+    st.markdown("#### 🧬 Perfil Mínimo (Min Profile)")
+    min_profile_df = pd.DataFrame({
+        "Índice": list(range(len(metrics["min_profile_area"]))),
+        "Distância": metrics["min_profile_area"]
+    })
+    st.line_chart(min_profile_df.set_index("Índice"))
